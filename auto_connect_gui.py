@@ -5,10 +5,23 @@ Launch this file directly or build it into a .exe with PyInstaller.
 
 from __future__ import annotations
 
-import logging
 import os
-import queue
 import sys
+
+# PyInstaller windowed builds (console=False) set sys.stdout and sys.stderr to
+# None.  Python's logging.StreamHandler and the "last resort" handler both
+# default to sys.stderr, so any log.info() call will crash with
+# ``AttributeError: 'NoneType' object has no attribute 'write'``.
+# Providing devnull file objects before *anything* imports logging prevents the
+# error and is the workaround recommended by PyInstaller's own documentation.
+# See: https://pyinstaller.org/en/stable/common-issues-and-pitfalls.html
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w")
+
+import logging
+import queue
 import threading
 import traceback
 import tkinter as tk
@@ -81,6 +94,10 @@ class AutoConnectApp(tk.Tk):
         self._pipeline_thread: Optional[threading.Thread] = None
 
         self._log_queue: queue.Queue[str] = queue.Queue()
+        self._queue_handler = _QueueHandler(self._log_queue)
+        self._queue_handler.setFormatter(logging.Formatter(
+            "%(asctime)s [%(name)s] %(message)s", datefmt="%H:%M:%S"))
+        self._configure_logging()
 
         self._continue_roi: Optional[dict] = None
         self._end_roi: Optional[dict] = None
@@ -89,6 +106,18 @@ class AutoConnectApp(tk.Tk):
         self._poll_log_queue()
         self._install_excepthook()
         self._redirect_stderr()
+
+    def _configure_logging(self):
+        """Route app logs to the GUI queue and remove stale stream handlers."""
+        root_logger = logging.getLogger()
+        root_logger.setLevel(logging.INFO)
+        for handler in list(root_logger.handlers):
+            root_logger.removeHandler(handler)
+        root_logger.addHandler(self._queue_handler)
+        # Disable the "last resort" handler — it writes to sys.stderr which may
+        # be a devnull placeholder in windowed builds, and we don't want it
+        # duplicating output that already goes through the queue handler.
+        logging.lastResort = None
 
     # ------------------------------------------------------------------
     # UI construction
@@ -335,13 +364,6 @@ class AutoConnectApp(tk.Tk):
 
         self._shutdown_event = threading.Event()
 
-        handler = _QueueHandler(self._log_queue)
-        handler.setFormatter(logging.Formatter(
-            "%(asctime)s [%(name)s] %(message)s", datefmt="%H:%M:%S"))
-        root_logger = logging.getLogger()
-        root_logger.setLevel(logging.INFO)
-        root_logger.addHandler(handler)
-
         self._set_running(True)
 
         def _worker():
@@ -469,11 +491,6 @@ class AutoConnectApp(tk.Tk):
 # ---------------------------------------------------------------------------
 
 def main():
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(name)s] %(message)s",
-        datefmt="%H:%M:%S",
-    )
     app = AutoConnectApp()
     app.mainloop()
 

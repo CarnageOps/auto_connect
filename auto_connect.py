@@ -837,6 +837,7 @@ def main():
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s [%(name)s] %(message)s",
         datefmt="%H:%M:%S",
+        stream=sys.stdout,
     )
 
     cfg = PipelineConfig(
