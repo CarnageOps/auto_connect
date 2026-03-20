@@ -8,6 +8,20 @@ Available as a **CLI script** (`auto_connect.py`) or a **standalone Windows exec
 
 Also ships **Network Fix** (`NetworkFix.exe`) — a small standalone tool that flushes DNS, renews DHCP, and switches your DNS servers to Google or Cloudflare with one click.
 
+### Administrator permissions (Network Fix)
+
+Windows only allows certain network changes when a process runs **elevated** (Administrator):
+
+| Action | Why admin is needed |
+|--------|---------------------|
+| **Flush DNS cache** (`ipconfig /flushdns`) | Usually works without elevation; may still be restricted on locked-down systems. |
+| **Renew DHCP lease** (`ipconfig /renew`) | Renegotiates your IP lease with the router/DHCP server; Windows treats this as a privileged network configuration change. |
+| **Set DNS servers** (`netsh interface ip set dns` / `add dns`) | Writes static DNS servers on a network adapter — same class of change as editing adapter properties in Control Panel. |
+
+Neither Auto-Connect nor Network Fix **requires** you to start the app as Administrator from the shortcut. When you click **Run Network Fix** and a step needs elevation, Windows shows the normal **UAC** prompt; if you approve, a short elevated helper runs and log output appears in the GUI. If you deny UAC, those steps fail; flush-only may still succeed.
+
+**What Network Fix actually runs:** optional `ipconfig /flushdns`, optional `ipconfig /renew`, and optional `netsh` commands to point IPv4 DNS at Google (8.8.8.8 / 8.8.4.4) or Cloudflare (1.1.1.1 / 1.0.0.1) on the adapter Windows uses for your default route. It does not install software, change firewall rules, or modify the game.
+
 ## Folder Structure
 
 ```
@@ -20,6 +34,7 @@ auto_connect/
 ├── auto_connect.spec        # PyInstaller build spec (AutoConnect)
 ├── network_fix.spec         # PyInstaller build spec (NetworkFix)
 ├── build.bat                # One-click build script (both exes)
+├── build_network_fix.bat    # Build NetworkFix.exe only
 ├── requirements.txt         # Python dependencies
 ├── README.md                # This file
 └── templates/
@@ -43,6 +58,13 @@ build.bat
 The output is `dist/AutoConnect.exe` (~74 MB). Double-click to launch.
 
 The build also produces `dist/NetworkFix.exe` — a lightweight standalone tool for DNS/DHCP fixes (see below).
+
+To build **only** Network Fix (faster iteration, smaller dependency surface):
+
+```bash
+cd auto_connect
+build_network_fix.bat
+```
 
 ### GUI Overview
 
@@ -94,7 +116,7 @@ Both the continue and end condition sections have a **Select Area** button that 
 - **Renew DHCP lease** — `ipconfig /renew`
 - **Set DNS servers** — switches your active network adapter to Google (`8.8.8.8` / `8.8.4.4`) or Cloudflare (`1.1.1.1` / `1.0.0.1`) via `netsh`
 
-**UAC elevation:** These operations require administrator privileges. If the app is not already elevated, clicking **Run Network Fix** will trigger the standard Windows UAC prompt — no manual restart needed. Output from the elevated process streams back into the log panel in real time.
+**UAC elevation:** See [Administrator permissions (Network Fix)](#administrator-permissions-network-fix) above. If the app is not already elevated, clicking **Run Network Fix** triggers the standard Windows UAC prompt; output from the elevated helper streams into the log panel.
 
 **CLI usage** (the underlying module also works standalone):
 
