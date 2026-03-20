@@ -23,6 +23,7 @@ if sys.stderr is None:
 import logging
 import queue
 import threading
+import time
 import traceback
 import tkinter as tk
 from tkinter import filedialog, scrolledtext, ttk
@@ -34,6 +35,14 @@ from auto_connect import (
     _default_roi,
     _stop_roi,
     run_pipeline,
+)
+from network_dns_refresh import (
+    DNS_PROVIDERS,
+    _detect_default_interface,
+    _is_admin,
+    flush_dns,
+    renew_dhcp,
+    set_dns,
 )
 from region_selector import select_region
 
@@ -87,7 +96,7 @@ class AutoConnectApp(tk.Tk):
         super().__init__()
         self.title("Auto-Connect")
         self.resizable(True, True)
-        self.minsize(540, 620)
+        self.minsize(540, 760)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self._shutdown_event: Optional[threading.Event] = None
@@ -248,6 +257,43 @@ class AutoConnectApp(tk.Tk):
 
         sf.columnconfigure(1, weight=1)
 
+        # ── Network Fix ──────────────────────────────────────────────
+        nf = ttk.LabelFrame(self, text="Network Fix (DNS / DHCP)")
+        nf.pack(fill=tk.X, **pad)
+
+        r = 0
+        ttk.Label(nf, text="DNS provider:").grid(row=r, column=0, sticky=tk.W, **pad)
+        self._dns_provider = tk.StringVar(value="cloudflare")
+        ttk.Combobox(
+            nf, textvariable=self._dns_provider,
+            values=list(DNS_PROVIDERS), state="readonly", width=12,
+        ).grid(row=r, column=1, sticky=tk.W, **pad)
+
+        r += 1
+        self._dns_flush = tk.BooleanVar(value=True)
+        ttk.Checkbutton(nf, text="Flush DNS cache",
+                        variable=self._dns_flush).grid(
+            row=r, column=0, columnspan=2, sticky=tk.W, **pad)
+
+        r += 1
+        self._dns_renew = tk.BooleanVar(value=True)
+        ttk.Checkbutton(nf, text="Renew DHCP lease",
+                        variable=self._dns_renew).grid(
+            row=r, column=0, columnspan=2, sticky=tk.W, **pad)
+
+        r += 1
+        self._dns_set = tk.BooleanVar(value=True)
+        ttk.Checkbutton(nf, text="Set DNS servers to provider above",
+                        variable=self._dns_set).grid(
+            row=r, column=0, columnspan=2, sticky=tk.W, **pad)
+
+        r += 1
+        self._net_fix_btn = ttk.Button(
+            nf, text="Run Network Fix", command=self._run_network_fix)
+        self._net_fix_btn.grid(row=r, column=0, columnspan=2, sticky=tk.W, **pad)
+
+        nf.columnconfigure(1, weight=1)
+
         # ── Controls ──────────────────────────────────────────────────
         ctrl = ttk.Frame(self)
         ctrl.pack(fill=tk.X, **pad)
@@ -320,6 +366,119 @@ class AutoConnectApp(tk.Tk):
     def _reset_end_roi(self):
         self._end_roi = None
         self._end_roi_label.set(_roi_label(None))
+
+    # ------------------------------------------------------------------
+    # Network fix (flush / renew / set DNS)
+    # ------------------------------------------------------------------
+
+    def _run_network_fix(self):
+        self._net_fix_btn.config(state=tk.DISABLED)
+
+        do_flush = self._dns_flush.get()
+        do_renew = self._dns_renew.get()
+        do_set = self._dns_set.get()
+        provider = self._dns_provider.get()
+
+        if not do_flush and not do_renew and not do_set:
+            log.info("Nothing selected — skipping network fix.")
+            self._net_fix_btn.config(state=tk.NORMAL)
+            return
+
+        if _is_admin():
+            self._run_network_fix_inline(do_flush, do_renew, do_set, provider)
+        else:
+            self._run_network_fix_elevated(do_flush, do_renew, do_set, provider)
+
+    def _run_network_fix_inline(self, do_flush, do_renew, do_set, provider):
+        """Run directly when we already have admin rights."""
+        def _worker():
+            try:
+                if do_flush:
+                    flush_dns()
+                if do_renew:
+                    renew_dhcp()
+                if do_set:
+                    iface = _detect_default_interface()
+                    if iface:
+                        log.info("Auto-detected interface: %s", iface)
+                        set_dns(iface, provider)
+                    else:
+                        log.error(
+                            "Could not auto-detect network interface. "
+                            "Set DNS manually or pass --interface on the CLI."
+                        )
+                log.info("Network fix complete.")
+            except Exception as exc:
+                tb_str = traceback.format_exc()
+                self._log_queue.put_nowait(f"Network fix error: {exc}\n{tb_str}")
+            finally:
+                self.after(0, lambda: self._net_fix_btn.config(state=tk.NORMAL))
+
+        threading.Thread(target=_worker, daemon=True).start()
+
+    def _run_network_fix_elevated(self, do_flush, do_renew, do_set, provider):
+        """Re-launch ourselves elevated with --network-fix-worker (works frozen)."""
+        import ctypes
+        import tempfile
+
+        log_file = os.path.join(tempfile.gettempdir(), "network_dns_refresh.log")
+
+        cli_args: list[str] = ["--network-fix-worker"]
+        if not do_flush:
+            cli_args.append("--skip-flush")
+        if not do_renew:
+            cli_args.append("--skip-renew")
+        if do_set:
+            cli_args.extend(["--provider", provider])
+        cli_args.extend(["--log-file", log_file])
+
+        exe = sys.executable
+        if getattr(sys, "frozen", False):
+            params = " ".join(cli_args)
+        else:
+            script = os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "auto_connect_gui.py")
+            params = f'"{script}" {" ".join(cli_args)}'
+
+        log.info("Requesting administrator privileges (UAC) …")
+
+        try:
+            if os.path.exists(log_file):
+                os.remove(log_file)
+        except OSError:
+            pass
+
+        ret = ctypes.windll.shell32.ShellExecuteW(  # type: ignore[attr-defined]
+            None, "runas", exe, params, None, 0,
+        )
+        if ret <= 32:
+            log.error("UAC elevation was denied or failed (code %d).", ret)
+            self._net_fix_btn.config(state=tk.NORMAL)
+            return
+
+        def _tail_log():
+            """Poll the log file until the elevated process finishes writing."""
+            seen = 0
+            stale_ticks = 0
+            while stale_ticks < 20:  # ~10 s of no new output → assume done
+                try:
+                    with open(log_file, "r", encoding="utf-8") as f:
+                        f.seek(seen)
+                        chunk = f.read()
+                    if chunk:
+                        seen += len(chunk)
+                        stale_ticks = 0
+                        for line in chunk.splitlines():
+                            if line.strip():
+                                self._log_queue.put_nowait(line)
+                    else:
+                        stale_ticks += 1
+                except FileNotFoundError:
+                    stale_ticks += 1
+                time.sleep(0.5)
+            self.after(0, lambda: self._net_fix_btn.config(state=tk.NORMAL))
+
+        threading.Thread(target=_tail_log, daemon=True).start()
 
     # ------------------------------------------------------------------
     # Start / stop pipeline
@@ -490,7 +649,36 @@ class AutoConnectApp(tk.Tk):
 
 # ---------------------------------------------------------------------------
 
+def _run_network_fix_worker(argv: list[str]) -> int:
+    """Headless worker mode for the elevated network-fix subprocess."""
+    from network_dns_refresh import main as _cli_main
+    import argparse
+
+    p = argparse.ArgumentParser()
+    p.add_argument("--network-fix-worker", action="store_true")
+    p.add_argument("--provider", choices=["google", "cloudflare"], default=None)
+    p.add_argument("--skip-flush", action="store_true")
+    p.add_argument("--skip-renew", action="store_true")
+    p.add_argument("--log-file", default=None)
+    args = p.parse_args(argv)
+
+    cli: list[str] = []
+    if args.skip_flush:
+        cli.append("--skip-flush")
+    if args.skip_renew:
+        cli.append("--skip-renew")
+    if args.provider:
+        cli.extend(["--provider", args.provider])
+    if args.log_file:
+        cli.extend(["--log-file", args.log_file])
+
+    return _cli_main(cli)
+
+
 def main():
+    if "--network-fix-worker" in sys.argv:
+        raise SystemExit(_run_network_fix_worker(sys.argv[1:]))
+
     app = AutoConnectApp()
     app.mainloop()
 

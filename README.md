@@ -6,15 +6,20 @@ Built for Wreckfest 2 but works with any game or application that shows a visual
 
 Available as a **CLI script** (`auto_connect.py`) or a **standalone Windows executable** (`AutoConnect.exe`) with a graphical interface.
 
+Also ships **Network Fix** (`NetworkFix.exe`) — a small standalone tool that flushes DNS, renews DHCP, and switches your DNS servers to Google or Cloudflare with one click.
+
 ## Folder Structure
 
 ```
 auto_connect/
 ├── auto_connect.py          # Core pipeline (CLI + importable API)
 ├── auto_connect_gui.py      # Tkinter GUI front-end
+├── network_dns_refresh.py   # DNS/DHCP refresh logic (shared module)
+├── network_fix_gui.py       # Standalone Network Fix GUI
 ├── region_selector.py       # Fullscreen click-and-drag ROI selector
-├── auto_connect.spec        # PyInstaller build spec
-├── build.bat                # One-click exe build script
+├── auto_connect.spec        # PyInstaller build spec (AutoConnect)
+├── network_fix.spec         # PyInstaller build spec (NetworkFix)
+├── build.bat                # One-click build script (both exes)
 ├── requirements.txt         # Python dependencies
 ├── README.md                # This file
 └── templates/
@@ -36,6 +41,8 @@ build.bat
 ```
 
 The output is `dist/AutoConnect.exe` (~74 MB). Double-click to launch.
+
+The build also produces `dist/NetworkFix.exe` — a lightweight standalone tool for DNS/DHCP fixes (see below).
 
 ### GUI Overview
 
@@ -76,6 +83,30 @@ Both the continue and end condition sections have a **Select Area** button that 
 5. Release the mouse button. The overlay closes, the GUI reappears, and the selected region is saved.
 6. Press **Escape** at any time to cancel and keep the previous value.
 7. Click **Reset** to revert to the default automatic region.
+
+## Network Fix (Standalone)
+
+`NetworkFix.exe` is a small standalone tool for fixing game connection errors caused by stale DNS or DHCP leases. It runs independently of Auto-Connect.
+
+**What it does (configurable via checkboxes):**
+
+- **Flush DNS cache** — `ipconfig /flushdns`
+- **Renew DHCP lease** — `ipconfig /renew`
+- **Set DNS servers** — switches your active network adapter to Google (`8.8.8.8` / `8.8.4.4`) or Cloudflare (`1.1.1.1` / `1.0.0.1`) via `netsh`
+
+**UAC elevation:** These operations require administrator privileges. If the app is not already elevated, clicking **Run Network Fix** will trigger the standard Windows UAC prompt — no manual restart needed. Output from the elevated process streams back into the log panel in real time.
+
+**CLI usage** (the underlying module also works standalone):
+
+```bash
+# Flush + renew + set Cloudflare DNS (run as admin)
+python network_dns_refresh.py --provider cloudflare
+
+# Preview commands without executing
+python network_dns_refresh.py --provider google --dry-run
+```
+
+The same Network Fix panel is also embedded inside the Auto-Connect GUI for convenience.
 
 ## Detection Modes
 
