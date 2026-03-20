@@ -206,6 +206,17 @@ python auto_connect.py
 
 Press **F9** at any time to stop. The script also exits automatically when the SETTINGS screen appears (connection succeeded).
 
+### Network Fix
+
+Double-click `NetworkFix.exe`, or run from source:
+
+```bash
+cd auto_connect
+python network_fix_gui.py
+```
+
+Pick a DNS provider, toggle the checkboxes, and click **Run Network Fix**. See [Network Fix (Standalone)](#network-fix-standalone) for details.
+
 ## Example Commands
 
 All commands assume you're in the `auto_connect/` directory.
@@ -415,12 +426,42 @@ The build is controlled by `auto_connect.spec`:
 - **Bundled data**: `templates/connect.png` and `templates/settings.png`
 - **Hidden imports**: `pynput.keyboard._win32`, `pynput.mouse._win32`
 
+### NetworkFix.exe
+
+To build **only** the Network Fix tool (no OpenCV or game-detection stack required):
+
+```bash
+cd auto_connect
+build_network_fix.bat
+```
+
+Or manually:
+
+```bash
+python -m PyInstaller network_fix.spec --clean --noconfirm
+```
+
+Output: `dist/NetworkFix.exe` (significantly smaller than AutoConnect — stdlib + tkinter + `network_dns_refresh` only).
+
+**What's included:** Python stdlib (`subprocess`, `ctypes`, `logging`, `argparse`), tkinter, and the `network_dns_refresh` module. No OpenCV, NumPy, game templates, or detection libraries are bundled.
+
+The build is controlled by `network_fix.spec`:
+
+- **Entry point**: `network_fix_gui.py`
+- **Mode**: single-file (`--onefile`), windowed (no console window)
+- **Bundled data**: none
+- **Hidden imports**: none (pure stdlib)
+
 ## Project Modules
 
 | File | Purpose |
 |---|---|
 | `auto_connect.py` | Core pipeline: screen capture, template matching, key-press daemon, kill switch. Exposes `PipelineConfig` and `run_pipeline()` for programmatic use. Also the CLI entry point (`python auto_connect.py`). |
-| `auto_connect_gui.py` | Tkinter GUI that wraps the pipeline. Entry point for the exe. |
-| `region_selector.py` | Fullscreen semi-transparent overlay for visual screen-area selection. Used by the GUI for both continue and end condition ROIs. |
-| `auto_connect.spec` | PyInstaller build spec. |
-| `build.bat` | One-click build script for Windows. |
+| `auto_connect_gui.py` | Tkinter GUI that wraps the pipeline. Entry point for `AutoConnect.exe`. Also embeds the **Network Fix (DNS / DHCP)** panel and a headless `--network-fix-worker` mode used for UAC-elevated subprocesses in frozen builds. |
+| `network_dns_refresh.py` | Shared DNS/DHCP refresh library and CLI. Flush DNS, renew DHCP, set IPv4 DNS to Google or Cloudflare. Used by both GUIs and their elevated worker modes. Also works standalone (`python network_dns_refresh.py --provider cloudflare`). |
+| `network_fix_gui.py` | Standalone Network Fix tkinter app. Entry point for `NetworkFix.exe`. Launches itself elevated via `--worker` when UAC is needed. |
+| `region_selector.py` | Fullscreen semi-transparent overlay for visual screen-area selection. Used by the Auto-Connect GUI for both continue and end condition ROIs. |
+| `auto_connect.spec` | PyInstaller one-file build spec for `AutoConnect.exe`. |
+| `network_fix.spec` | PyInstaller one-file build spec for `NetworkFix.exe`. |
+| `build.bat` | One-click build script that produces both `AutoConnect.exe` and `NetworkFix.exe`. |
+| `build_network_fix.bat` | Builds only `NetworkFix.exe` (faster iteration, no OpenCV/game stack needed). |
