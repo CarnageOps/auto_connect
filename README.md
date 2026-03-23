@@ -135,7 +135,7 @@ The same Network Fix panel is also embedded inside the Auto-Connect GUI for conv
 | Mode | Speed | How it works |
 |---|---|---|
 | **template** (default) | **~2 ms/frame** | `cv2.matchTemplate` pixel correlation against a reference PNG |
-| **ocr** | ~700 ms/frame | EasyOCR / PaddleOCR text recognition with optional YOLO pre-filter |
+| **ocr** | ~700 ms/frame | EasyOCR text recognition with optional YOLO pre-filter |
 
 Template mode is **350x faster** than OCR. Use it whenever the target prompt has a consistent visual appearance (which game UI elements always do).
 
@@ -154,7 +154,7 @@ Screen ──► wincam/mss capture (ROI)
 | Capture | `wincam` (DirectX 11, ~1ms/frame on Windows) with `mss` fallback |
 | Template detection | `cv2.matchTemplate` with multi-scale support |
 | Stop template | Same matcher -- exits when a "success" screen appears |
-| OCR detection | EasyOCR (default) or PaddleOCR, optional YOLOv8 pre-filter |
+| OCR detection | EasyOCR, optional YOLOv8 pre-filter |
 | Actuation | `pyautogui` key press, synced 1:1 with matched frames by default |
 | Kill switch | `pynput` global keyboard listener (default **F9**) |
 | Temporal logic | `time.perf_counter()` delta-t grace period |
@@ -166,12 +166,6 @@ Screen ──► wincam/mss capture (ROI)
 ```bash
 cd auto_connect
 pip install -r requirements.txt
-```
-
-For PaddleOCR support (optional, OCR mode only):
-
-```bash
-pip install paddleocr paddlepaddle-gpu
 ```
 
 ### For building the Windows executable
@@ -360,7 +354,6 @@ python auto_connect.py ^
 | `--timeout-delta` | `3.0` | Seconds without seeing prompt before pausing |
 | `--target-text` | `CONNECT` | Text to detect (OCR mode only) |
 | `--match-threshold` | `75` | Fuzzy match threshold 0--100 (OCR mode only) |
-| `--ocr-engine` | `easyocr` | OCR backend: `easyocr` or `paddle` |
 | `--yolo-weights` | none | Path to YOLOv8 `.pt` weights (OCR mode only) |
 | `--yolo-conf` | `0.40` | YOLO confidence threshold |
 | `--roi` | auto | Capture region as `left,top,width,height` |
@@ -378,7 +371,7 @@ python auto_connect.py ^
 - The bundled `templates/settings.png` matches the "SETTINGS" header that appears after a successful connection. When detected, the script exits with a "connected!" message.
 - **Sync mode** (default, `--interval 0`) presses the key once per matched frame, so press rate equals detection rate (~20/sec with template mode). Use `--interval 0.5` for fixed-rate presses if you prefer.
 - **Multi-scale matching** tests 5 scales (0.5x, 0.75x, 1.0x, 1.25x, 1.5x) to handle resolution differences. Disable with `--no-multiscale` if your template already matches the render resolution.
-- **OCR mode** is available via `--mode ocr` for arbitrary text detection. It loads EasyOCR/PaddleOCR models on first run (~100 MB download).
+- **OCR mode** is available via `--mode ocr` for arbitrary text detection. It loads EasyOCR models on first run (~100 MB download).
 - **wincam** is auto-detected on Windows. If not installed, `mss` is used transparently.
 - **pyautogui failsafe** is always enabled -- move your mouse to the top-left corner as an emergency stop.
 
@@ -411,7 +404,7 @@ The exe bundles **template mode only** to keep the file size manageable:
 | Included | Excluded (OCR mode) |
 |---|---|
 | `cv2` (opencv), `numpy`, `Pillow` | `torch`, `ultralytics` (YOLO) |
-| `pyautogui`, `pynput` | `easyocr`, `paddleocr` |
+| `pyautogui`, `pynput` | `easyocr` |
 | `rapidfuzz`, `mss`, `wincam` | `scipy`, `matplotlib`, `pandas` |
 | `templates/connect.png`, `templates/settings.png` | |
 

@@ -11,10 +11,8 @@ wincam; sys_platform == "win32"
 # YOLO object detection
 ultralytics
 
-# OCR engines (easyocr is default; install paddleocr + paddlepaddle for --ocr-engine paddle)
+# OCR (spectate_capture OCR mode, auto_connect --mode ocr)
 easyocr
-# paddleocr
-# paddlepaddle-gpu
 
 # Fuzzy string matching
 rapidfuzz

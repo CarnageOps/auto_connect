@@ -43,8 +43,6 @@ a = Analysis(
         "torch",
         "ultralytics",
         "easyocr",
-        "paddleocr",
-        "paddlepaddle",
         "matplotlib",
         "scipy",
         "pandas",
