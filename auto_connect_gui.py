@@ -266,7 +266,7 @@ class AutoConnectApp(tk.Tk):
         self._dns_provider = tk.StringVar(value="cloudflare")
         ttk.Combobox(
             nf, textvariable=self._dns_provider,
-            values=list(DNS_PROVIDERS), state="readonly", width=12,
+            values=list(DNS_PROVIDERS), state="readonly", width=16,
         ).grid(row=r, column=1, sticky=tk.W, **pad)
 
         r += 1
@@ -652,11 +652,12 @@ class AutoConnectApp(tk.Tk):
 def _run_network_fix_worker(argv: list[str]) -> int:
     """Headless worker mode for the elevated network-fix subprocess."""
     from network_dns_refresh import main as _cli_main
+    from network_dns_refresh import DNS_PROVIDERS as _DNS_PROVIDERS
     import argparse
 
     p = argparse.ArgumentParser()
     p.add_argument("--network-fix-worker", action="store_true")
-    p.add_argument("--provider", choices=["google", "cloudflare"], default=None)
+    p.add_argument("--provider", choices=list(_DNS_PROVIDERS), default=None)
     p.add_argument("--skip-flush", action="store_true")
     p.add_argument("--skip-renew", action="store_true")
     p.add_argument("--log-file", default=None)

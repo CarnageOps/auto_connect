@@ -6,7 +6,7 @@ Built for Wreckfest 2 but works with any game or application that shows a visual
 
 Available as a **CLI script** (`auto_connect.py`) or a **standalone Windows executable** (`AutoConnect.exe`) with a graphical interface.
 
-Also ships **Network Fix** (`NetworkFix.exe`) — a small standalone tool that flushes DNS, renews DHCP, and switches your DNS servers to Google or Cloudflare with one click.
+Also ships **Network Fix** (`NetworkFix.exe`) — a small standalone tool that flushes DNS, renews DHCP, and switches your DNS servers to a public resolver (Google, Cloudflare, Quad9, OpenDNS, AdGuard, CleanBrowsing, or Comodo) with one click.
 
 ### Administrator permissions (Network Fix)
 
@@ -20,7 +20,7 @@ Windows only allows certain network changes when a process runs **elevated** (Ad
 
 Neither Auto-Connect nor Network Fix **requires** you to start the app as Administrator from the shortcut. When you click **Run Network Fix** and a step needs elevation, Windows shows the normal **UAC** prompt; if you approve, a short elevated helper runs and log output appears in the GUI. If you deny UAC, those steps fail; flush-only may still succeed.
 
-**What Network Fix actually runs:** optional `ipconfig /flushdns`, optional `ipconfig /renew`, and optional `netsh` commands to point IPv4 DNS at Google (8.8.8.8 / 8.8.4.4) or Cloudflare (1.1.1.1 / 1.0.0.1) on the adapter Windows uses for your default route. It does not install software, change firewall rules, or modify the game.
+**What Network Fix actually runs:** optional `ipconfig /flushdns`, optional `ipconfig /renew`, and optional `netsh` commands to point IPv4 DNS at a public resolver (Google, Cloudflare, Quad9, OpenDNS, AdGuard, CleanBrowsing, or Comodo) on the adapter Windows uses for your default route. It does not install software, change firewall rules, or modify the game.
 
 ## Folder Structure
 
@@ -114,7 +114,7 @@ Both the continue and end condition sections have a **Select Area** button that 
 
 - **Flush DNS cache** — `ipconfig /flushdns`
 - **Renew DHCP lease** — `ipconfig /renew`
-- **Set DNS servers** — switches your active network adapter to Google (`8.8.8.8` / `8.8.4.4`) or Cloudflare (`1.1.1.1` / `1.0.0.1`) via `netsh`
+- **Set DNS servers** — switches your active network adapter to a chosen public resolver via `netsh`
 
 **UAC elevation:** See [Administrator permissions (Network Fix)](#administrator-permissions-network-fix) above. If the app is not already elevated, clicking **Run Network Fix** triggers the standard Windows UAC prompt; output from the elevated helper streams into the log panel.
 
@@ -458,7 +458,7 @@ The build is controlled by `network_fix.spec`:
 |---|---|
 | `auto_connect.py` | Core pipeline: screen capture, template matching, key-press daemon, kill switch. Exposes `PipelineConfig` and `run_pipeline()` for programmatic use. Also the CLI entry point (`python auto_connect.py`). |
 | `auto_connect_gui.py` | Tkinter GUI that wraps the pipeline. Entry point for `AutoConnect.exe`. Also embeds the **Network Fix (DNS / DHCP)** panel and a headless `--network-fix-worker` mode used for UAC-elevated subprocesses in frozen builds. |
-| `network_dns_refresh.py` | Shared DNS/DHCP refresh library and CLI. Flush DNS, renew DHCP, set IPv4 DNS to Google or Cloudflare. Used by both GUIs and their elevated worker modes. Also works standalone (`python network_dns_refresh.py --provider cloudflare`). |
+| `network_dns_refresh.py` | Shared DNS/DHCP refresh library and CLI. Flush DNS, renew DHCP, set IPv4 DNS to a public resolver. Used by both GUIs and their elevated worker modes. Also works standalone (`python network_dns_refresh.py --provider cloudflare`). |
 | `network_fix_gui.py` | Standalone Network Fix tkinter app. Entry point for `NetworkFix.exe`. Launches itself elevated via `--worker` when UAC is needed. |
 | `region_selector.py` | Fullscreen semi-transparent overlay for visual screen-area selection. Used by the Auto-Connect GUI for both continue and end condition ROIs. |
 | `auto_connect.spec` | PyInstaller one-file build spec for `AutoConnect.exe`. |

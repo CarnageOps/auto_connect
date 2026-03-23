@@ -93,7 +93,7 @@ class NetworkFixApp(tk.Tk):
         self._dns_provider = tk.StringVar(value="cloudflare")
         ttk.Combobox(
             nf, textvariable=self._dns_provider,
-            values=list(DNS_PROVIDERS), state="readonly", width=12,
+            values=list(DNS_PROVIDERS), state="readonly", width=16,
         ).grid(row=r, column=1, sticky=tk.W, **pad)
 
         r += 1

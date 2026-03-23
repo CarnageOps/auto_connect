@@ -2,8 +2,9 @@
 Network DNS Refresh — Flush / Renew / Set DNS Provider
 
 Automates the manual "ipconfig /flushdns && ipconfig /renew" dance and
-optionally switches the IPv4 DNS servers on a given network adapter to
-Google (8.8.8.8 / 8.8.4.4) or Cloudflare (1.1.1.1 / 1.0.0.1).
+optionally switches the IPv4 DNS servers on a given network adapter to a
+public resolver (Google, Cloudflare, Quad9, OpenDNS, AdGuard, CleanBrowsing,
+or Comodo).
 
 Requires: Windows, Python 3.8+, no third-party packages.
 Must run elevated (Run as Administrator) for renew and DNS changes.
@@ -37,8 +38,13 @@ import sys
 log = logging.getLogger("network_dns_refresh")
 
 DNS_PROVIDERS: dict[str, tuple[str, str]] = {
-    "google":     ("8.8.8.8",  "8.8.4.4"),
-    "cloudflare": ("1.1.1.1",  "1.0.0.1"),
+    "google":        ("8.8.8.8",       "8.8.4.4"),
+    "cloudflare":    ("1.1.1.1",       "1.0.0.1"),
+    "quad9":         ("9.9.9.9",       "149.112.112.112"),
+    "opendns":       ("208.67.222.222", "208.67.220.220"),
+    "adguard":       ("94.140.14.14",  "94.140.15.15"),
+    "cleanbrowsing": ("185.228.168.9", "185.228.169.9"),
+    "comodo":        ("8.26.56.26",    "8.20.247.20"),
 }
 
 
@@ -112,7 +118,7 @@ def set_dns(interface: str, provider: str, *, dry_run: bool = False) -> None:
 
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="Flush DNS, renew DHCP, and optionally set DNS to Google or Cloudflare.",
+        description="Flush DNS, renew DHCP, and optionally set a public DNS provider.",
     )
     p.add_argument(
         "--provider",
